@@ -97,8 +97,12 @@ class EtcdClientOwner(object):
     reconnecting, optionally copying the cluster ID.
     """
 
-    def __init__(self, etcd_authority, etcd_scheme, etcd_key, etcd_cert,
-                 etcd_ca):
+    def __init__(self,
+                 etcd_authority,
+                 etcd_scheme="http",
+                 etcd_key=None,
+                 etcd_cert=None,
+                 etcd_ca=None):
         super(EtcdClientOwner, self).__init__()
         self.etcd_authority = etcd_authority
         self.etcd_scheme = etcd_scheme
@@ -148,9 +152,16 @@ class EtcdWatcher(EtcdClientOwner):
 
     def __init__(self,
                  etcd_authority,
-                 key_to_poll):
-        super(EtcdWatcher, self).__init__(etcd_authority, "http", None, None,
-                                          None)
+                 key_to_poll,
+                 etcd_scheme="http",
+                 etcd_key=None,
+                 etcd_cert=None,
+                 etcd_ca=None):
+        super(EtcdWatcher, self).__init__(etcd_authority,
+                                          etcd_scheme=etcd_scheme,
+                                          etcd_key=etcd_key,
+                                          etcd_cert=etcd_cert,
+                                          etcd_ca=etcd_ca)
         self.key_to_poll = key_to_poll
         self.next_etcd_index = None
 

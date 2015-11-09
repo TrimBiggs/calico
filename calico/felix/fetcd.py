@@ -108,10 +108,10 @@ class EtcdAPI(EtcdClientOwner, Actor):
 
     def __init__(self, config, hosts_ipset):
         super(EtcdAPI, self).__init__(config.ETCD_ADDR,
-                                      config.ETCD_SCHEME,
-                                      config.ETCD_KEY_FILE,
-                                      config.ETCD_CERT_FILE,
-                                      config.ETCD_CA_FILE)
+                                      etcd_scheme=config.ETCD_SCHEME,
+                                      etcd_key=config.ETCD_KEY_FILE,
+                                      etcd_cert=config.ETCD_CERT_FILE,
+                                      etcd_ca=config.ETCD_CA_FILE)
         self._config = config
 
         # Timestamp storing when the EtcdAPI started. This info is needed
@@ -686,11 +686,12 @@ class EtcdStatusReporter(EtcdClientOwner, Actor):
     """
 
     def __init__(self, config):
-        super(EtcdStatusReporter, self).__init__(config.ETCD_ADDR,
-                                                 config.ETCD_SCHEME,
-                                                 config.ETCD_KEY_FILE,
-                                                 config.ETCD_CERT_FILE,
-                                                 config.ETCD_CA_FILE)
+        super(EtcdStatusReporter, self).__init__(
+                                               config.ETCD_ADDR,
+                                               etcd_scheme=config.ETCD_SCHEME,
+                                               etcd_key=config.ETCD_KEY_FILE,
+                                               etcd_cert=config.ETCD_CERT_FILE,
+                                               etcd_ca=config.ETCD_CA_FILE)
         self._config = config
         self._endpoint_status = {IPV4: {}, IPV6: {}}
 
