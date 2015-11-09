@@ -159,10 +159,11 @@ class Config(object):
 
         :raises EtcdException
         """
+        log.info("Config object init")
         self.parameters = {}
 
         self.add_parameter("EtcdAddr", "Address and port for etcd",
-                           "localhost:4001", sources=[ENV, FILE])
+                           "localhost:2379", sources=[ENV, FILE])
         self.add_parameter("FelixHostname", "Felix compute host hostname",
                            socket.gethostname(), sources=[ENV, FILE])
         self.add_parameter("EtcdScheme", "Protocol type for http or https",
@@ -199,9 +200,9 @@ class Config(object):
         self.add_parameter("LogSeverityFile",
                            "Log severity for logging to file", "INFO")
         self.add_parameter("LogSeveritySys",
-                           "Log severity for logging to syslog", "ERROR")
+                           "Log severity for logging to syslog", "INFO")
         self.add_parameter("LogSeverityScreen",
-                           "Log severity for logging to screen", "ERROR")
+                           "Log severity for logging to screen", "INFO")
         self.add_parameter("IpInIpEnabled",
                            "IP-in-IP device support enabled", False,
                            value_is_bool=True)
@@ -228,9 +229,13 @@ class Config(object):
                            "IP addresses using a single tag.",
                            2**20, value_is_int=True)
 
+        log.info("Done adding parameters, Reading ENV vars")
+
         # Read the environment variables, then the configuration file.
         self._read_env_vars()
+        log.info("Reading config file...")
         self._read_cfg_file(config_path)
+        log.info("Finishing update")
         self._finish_update(final=False)
 
     def add_parameter(self, name, description, default, **kwargs):
@@ -267,6 +272,10 @@ class Config(object):
         self.ETCD_KEY_FILE = self.parameters["EtcdKeyFile"].value
         self.ETCD_CERT_FILE = self.parameters["EtcdCertFile"].value
         self.ETCD_CA_FILE = self.parameters["EtcdCaFile"].value
+        log.warning("Got etcd values: addr=%s, scheme=%s, key=%s, cert=%s, "
+                    "ca=%s" %
+                    (self.ETCD_ADDR, self.ETCD_SCHEME, self.ETCD_KEY_FILE,
+                     self.ETCD_CERT_FILE, self.ETCD_CA_FILE))
         self.STARTUP_CLEANUP_DELAY = self.parameters["StartupCleanupDelay"].value
         self.RESYNC_INTERVAL = self.parameters["PeriodicResyncInterval"].value
         self.REFRESH_INTERVAL = self.parameters["IptablesRefreshInterval"].value
@@ -298,6 +307,10 @@ class Config(object):
                                 self.LOGLEVSYS,
                                 self.LOGLEVSCR,
                                 gevent_in_use=True)
+        log.info("Logging initialized with config parameters, check etcd "
+                 "values")
+
+        self._validate_etcd()
 
         if final:
             # Log configuration - the whole lot of it.
@@ -374,6 +387,7 @@ class Config(object):
         :raises ConfigException
         """
         fields = self.ETCD_ADDR.split(":")
+        log.info("Validating config")
         if len(fields) != 2:
             raise ConfigException("Invalid format for field - must be "
                                   "hostname:port", self.parameters["EtcdAddr"])
@@ -385,35 +399,7 @@ class Config(object):
             raise ConfigException("Invalid port in field",
                                   self.parameters["EtcdAddr"])
 
-        if self.ETCD_SCHEME == "https":
-            # key and certificate must be both specified or both not specified
-            if bool(self.ETCD_KEY_FILE) != bool(self.ETCD_CERT_FILE):
-                raise ConfigException("Invalid (key, certificate) "
-                                      "combination. Key and certificate must "
-                                      "both be specified or both be blank.",
-                                      (self.parameters["EtcdKeyFile"],
-                                       self.parameters["EtcdCertFile"]))
-
-            # Make sure etcd key and certificate are readable
-            if self.ETCD_KEY_FILE and self.ETCD_CERT_FILE:
-                if not (os.access(self.ETCD_KEY_FILE, os.R_OK) and
-                            os.access(self.ETCD_CERT_FILE, os.R_OK)):
-                    raise ConfigException("Cannot read key and/or certificate "
-                                          "file(s). Both must be readable "
-                                          "file paths. ",
-                                          (self.parameters["EtcdKeyFile"],
-                                           self.parameters["EtcdCertFile"]))
-
-                # If Certificate Authority cert provided, check it's readable
-                if self.ETCD_CA_FILE and \
-                        not os.access(self.ETCD_CA_FILE, os.R_OK):
-                    raise ConfigException("Cannot read CA certificate. Value "
-                                          "must be readable file path.",
-                                          self.parameters["EtcdCaFile"])
-        elif self.ETCD_SCHEME != "http":
-            raise ConfigException("Invalid protocol scheme. Value must be one "
-                                  "of: \"\", \"http\", \"https\".",
-                                  self.parameters["EtcdScheme"])
+        # TODO: Move "_validate_etcd" body here
 
         try:
             self.LOGLEVFILE = LOGLEVELS[self.LOGLEVFILE.lower()]
@@ -517,3 +503,44 @@ class Config(object):
         except socket.gaierror:
             raise ConfigException("Invalid or unresolvable value",
                                   self.parameters[name])
+
+    def _validate_etcd(self):
+        #TODO: Remove and move this back up to normal validation function
+        log.info("-----------------------Checking etcd config")
+        try:
+            if self.ETCD_SCHEME == "https":
+                # key and certificate must be both specified or both not specified
+                if bool(self.ETCD_KEY_FILE) != bool(self.ETCD_CERT_FILE):
+                    log.info("ETCD_KEY and CERT no specified together")
+                    raise ConfigException("Invalid (key, certificate) "
+                                          "combination. Key and certificate must "
+                                          "both be specified or both be blank.",
+                                          (self.parameters["EtcdKeyFile"],
+                                          self.parameters["EtcdCertFile"]))
+
+                # Make sure etcd key and certificate are readable
+                if self.ETCD_KEY_FILE and self.ETCD_CERT_FILE:
+                    if not (os.access(self.ETCD_KEY_FILE, os.R_OK) and
+                                os.access(self.ETCD_CERT_FILE, os.R_OK)):
+                        log.info("ETCD_KEY and/or CERT not readable")
+                        raise ConfigException("Cannot read key and/or certificate "
+                                              "file(s). Both must be readable "
+                                              "file paths. ",
+                                              (self.parameters["EtcdKeyFile"],
+                                               self.parameters["EtcdCertFile"]))
+
+                    # If Certificate Authority cert provided, check it's readable
+                    if self.ETCD_CA_FILE and \
+                            not os.access(self.ETCD_CA_FILE, os.R_OK):
+                        log.info("ETCD_CA not readable")
+                        raise ConfigException("Cannot read CA certificate. Value "
+                                              "must be readable file path.",
+                                              self.parameters["EtcdCaFile"])
+            elif self.ETCD_SCHEME != "http":
+                log.info("ETCD_SCHEME not http/https")
+                raise ConfigException("Invalid protocol scheme. Value must be one "
+                                      "of: \"\", \"http\", \"https\".",
+                                      self.parameters["EtcdScheme"])
+        except Exception as e:
+            log.error("Hit error checking etcd values", e)
+        log.info("-------------GOT THROUGH CHECKING ETCD VALUES")

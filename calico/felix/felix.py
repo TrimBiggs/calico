@@ -213,7 +213,13 @@ def main():
     options, args = parser.parse_args()
 
     try:
+        print "Loading Felix...."
+        _log.info("Loading Felix config...")
         config = Config(options.config_file)
+        #_log.warning("Got etcd values: addr=%s, scheme=%s, key=%s, cert=%s, "
+        #             "ca=%s" %
+        #             (config.ETCD_ADDR, config.ETCD_SCHEME, config.ETCD_KEY_FILE,
+        #              config.ETCD_CERT_FILE, config.ETCD_CA_FILE))
     except Exception as e:
         # Config loading error, and not just invalid parameters (from optparse)
         # as they generate a SystemExit. Attempt to open a log file, ignoring
@@ -224,6 +230,7 @@ def main():
                                     logging.DEBUG,
                                     logging.DEBUG,
                                     gevent_in_use=True)
+            _log.info("Logging initialized from felix.main() ")
         except Exception:
             pass
 

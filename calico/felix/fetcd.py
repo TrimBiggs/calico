@@ -558,6 +558,9 @@ class _FelixEtcdWatcher(gevent.Greenlet):
         # protocol.
         reader = MessageReader(update_conn)
         writer = MessageWriter(update_conn)
+        #TODO: Remove log
+        _log.warning("++++++++++++++++++ Got Message Reader and Writer in "
+                     "fetcd. Sending config...")
         # Give the driver its config.
         writer.send_message(
             MSG_TYPE_INIT,
@@ -570,6 +573,7 @@ class _FelixEtcdWatcher(gevent.Greenlet):
                 MSG_KEY_CA_FILE: self._config.ETCD_CA_FILE
             }
         )
+        _log.warning("Sent INIT message...")
         return reader, writer
 
     def on_endpoint_set(self, response, hostname, orchestrator,

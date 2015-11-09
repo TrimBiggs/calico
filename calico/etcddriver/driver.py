@@ -47,7 +47,8 @@ from threading import Thread, Event
 import time
 from urlparse import urlparse
 
-from ijson.backends import yajl2 as ijson
+#from ijson.backends import yajl2 as ijson
+import ijson
 import urllib3
 from urllib3 import HTTPConnectionPool, HTTPSConnectionPool
 from urllib3.exceptions import ReadTimeoutError
@@ -74,6 +75,9 @@ _log = logging.getLogger(__name__)
 class EtcdDriver(object):
     def __init__(self, felix_sck):
         # Wrap the socket with our protocol reader/writer objects.
+        _log.info("Starting ETCD Driver")
+        #TODO: Remove print
+        print "|||||||||||||||||||||||||| Starting ETCD Driver"
         self._msg_reader = MessageReader(felix_sck)
         self._msg_writer = MessageWriter(felix_sck)
 
@@ -113,6 +117,9 @@ class EtcdDriver(object):
 
     def start(self):
         """Starts the driver's reader and resync threads."""
+        # TODO: Remove this log
+        _log.info("++++++++++++++++++++++++++ Running Driver.start")
+        _log.info("Running `start` method on Driver")
         self._reader_thread.start()
         self._resync_thread.start()
 
@@ -122,6 +129,8 @@ class EtcdDriver(object):
 
         :returns True if the driver stopped, False on timeout.
         """
+        #TODO: Remove this log
+        _log.info("++++++++++++++++++++++++++ Running Driver.join")
         self._stop_event.wait(timeout=timeout)
         stopped = self._stop_event.is_set()
         if stopped:
@@ -155,14 +164,22 @@ class EtcdDriver(object):
         So far, this means reading the init message and then dealing
         with the exception if Felix dies.
         """
+        #TODO: Remove log
+        _log.warning(" ++++++++++++++++++++++++++ Got message from socket")
         try:
             while not self._stop_event.is_set():
                 for msg_type, msg in self._msg_reader.new_messages(timeout=1):
                     if msg_type == MSG_TYPE_INIT:
+                        #TODO: Remove log
+                        _log.warning(" ++++++++++++++++++++++++++ Got INIT")
                         self._handle_init(msg)
                     elif msg_type == MSG_TYPE_CONFIG:
+                        #TODO: Remove log
+                        _log.warning(" ++++++++++++++++++++++++++ Got CONFIG")
                         self._handle_config(msg)
                     elif msg_type == MSG_TYPE_RESYNC:
+                        #TODO: Remove log
+                        _log.warning(" ++++++++++++++++++++++++++ Got RESYNC")
                         self._handle_resync(msg)
                     else:
                         _log.error("Unexpected message from Felix: %s", msg)
@@ -178,16 +195,23 @@ class EtcdDriver(object):
         Called from the reader thread.
         """
         # OK to dump the msg, it's a one-off.
-        _log.info("Got init message from Felix %s", msg)
+        _log.info("Got init message from Felix")
+        #TODO: Remove print
+        print "|||||||||||||||||||||||||| Handling init..."
         self._etcd_base_url = msg[MSG_KEY_ETCD_URL].rstrip("/")
-        self._etcd_scheme = msg[MSG_KEY_ETCD_URL].split(":")[0]
-        self._etcd_url_parts = urlparse(self._etcd_base_url,
-                                        scheme=self._etcd_scheme)
+        print "||| Base URL is %s" % self._etcd_base_url
+        #self._etcd_scheme = msg[MSG_KEY_ETCD_URL].split(":")[0]
+        self._etcd_url_parts = urlparse(self._etcd_base_url)
+        print "|||| Scheme is %s" % self._etcd_url_parts.scheme
         self._etcd_key_file = msg[MSG_KEY_KEY_FILE]
+        print "|||| Key file is %s" % self._etcd_key_file
         self._etcd_cert_file = msg[MSG_KEY_CERT_FILE]
+        print "|||| Cert file is %s" % self._etcd_cert_file
         self._etcd_ca_file = msg[MSG_KEY_CA_FILE]
+        print "|||| CA file is %s" % self._etcd_ca_file
         self._hostname = msg[MSG_KEY_HOSTNAME]
         self._init_received.set()
+        print "|||| INIT Received"
 
     def _handle_config(self, msg):
         """
@@ -214,8 +238,11 @@ class EtcdDriver(object):
         to Felix.
         """
         _log.info("Resync thread started, waiting for config to be loaded...")
+        #TODO: Remove Print
+        print "||||||||||||||||||||||||| RESYNC"
         self._init_received.wait()
         _log.info("Config loaded; continuing.")
+        print "||||||||||||||||||||||||| Config loaded"
 
         while not self._stop_event.is_set():
             loop_start = monotonic_time()
@@ -226,24 +253,33 @@ class EtcdDriver(object):
             try:
                 # Start with a fresh HTTP pool just in case it got into a bad
                 # state.
+                #TODO: Remove print
+                print "||||||||||||||||||||||||| Getting etcd pool"
                 self._resync_http_pool = self.get_etcd_connection()
+                print "|||| GOT HTTP connection"
+
                 # Before we get to the snapshot, Felix needs the configuration.
                 self._send_status(STATUS_WAIT_FOR_READY)
                 self._wait_for_ready()
                 self._preload_config()
+                print "|||| Config Preloaded"
                 # Now (on the first run through) wait for Felix to process the
                 # config.
                 self._wait_for_config()
+                print "|||| Wait for config"
                 # Kick off the snapshot request as far as the headers.
                 self._send_status(STATUS_RESYNC)
+                print "|||| SEND RESYNC Status"
                 resp, snapshot_index = self._start_snapshot_request()
                 # Before reading from the snapshot, start the watcher thread.
                 self._start_watcher(snapshot_index)
+                print "|||| Started watcher"
                 # Incrementally process the snapshot, merging in events from
                 # the queue.
                 self._process_snapshot_and_events(resp, snapshot_index)
                 # We're now in-sync.  Tell Felix.
                 self._send_status(STATUS_IN_SYNC)
+                print "|||| SEND Status In Sync"
                 # Then switch to processing events only.
                 self._process_events_only()
             except WriteFailed:
@@ -254,6 +290,11 @@ class EtcdDriver(object):
             except (urllib3.exceptions.HTTPError,
                     HTTPException,
                     socket.error) as e:
+#                _log.error("Got etcd values: scheme=%s" % self._etcd_scheme, e)
+#                _log.error("key=%s" % self._etcd_key_file, e)
+#                _log.error("cert=%s " % self._etcd_cert_file, e)
+#                _log.error("ca=%s " % self._etcd_ca_file, e)
+                print "|||| About to print error...."
                 _log.error("Request to etcd failed: %r; resyncing.", e)
                 if monotonic_time() - loop_start < 1:
                     _log.debug("May be tight looping, sleeping...")
@@ -580,13 +621,22 @@ class EtcdDriver(object):
             self._watcher_stop_event = None
 
     def get_etcd_connection(self):
-        if self._etcd_scheme == "https":
-            return HTTPSConnectionPool(self._etcd_url_parts.hostname,
-                                       self._etcd_url_parts.port or 2379,
-                                       key_file=self._etcd_key_file,
-                                       cert_file=self._etcd_cert_file,
-                                       ca_certs=self._etcd_ca_file,
-                                       maxsize=1)
+        #TODO: Remove print
+        print "|||||||||||||||||||||||||| Getting ETCD connection"
+        try:
+            if self._etcd_url_parts.scheme == "https":
+                #TODO: Remove print
+                print "|||||||||||||||||||||||||| Got HTTPS"
+                return HTTPSConnectionPool(self._etcd_url_parts.hostname,
+                                           self._etcd_url_parts.port or 2379,
+                                           key_file=self._etcd_key_file,
+                                           cert_file=self._etcd_cert_file,
+                                           ca_certs=self._etcd_ca_file,
+                                           maxsize=1)
+        except Exception as e:
+            print "||||||||||||||| EXCEPTION from HTTPS connection"
+            _log.error("Hit error when starting SSL etcd connection", e)
+            raise
         return HTTPConnectionPool(self._etcd_url_parts.hostname,
                                   self._etcd_url_parts.port or 2379,
                                   maxsize=1)
