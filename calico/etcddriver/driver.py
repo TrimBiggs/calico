@@ -44,7 +44,8 @@ from threading import Thread, Event
 import time
 from urlparse import urlparse
 
-from ijson.backends import yajl2 as ijson
+#from ijson.backends import yajl2 as ijson
+import ijson
 import urllib3
 from urllib3 import HTTPConnectionPool, HTTPSConnectionPool
 from urllib3.exceptions import ReadTimeoutError

@@ -162,7 +162,7 @@ class Config(object):
         self.parameters = {}
 
         self.add_parameter("EtcdAddr", "Address and port for etcd",
-                           "localhost:4001", sources=[ENV, FILE])
+                           "localhost:2379", sources=[ENV, FILE])
         self.add_parameter("FelixHostname", "Felix compute host hostname",
                            socket.gethostname(), sources=[ENV, FILE])
         self.add_parameter("EtcdScheme", "Protocol type for http or https",
@@ -267,6 +267,10 @@ class Config(object):
         self.ETCD_KEY_FILE = self.parameters["EtcdKeyFile"].value
         self.ETCD_CERT_FILE = self.parameters["EtcdCertFile"].value
         self.ETCD_CA_FILE = self.parameters["EtcdCaFile"].value
+        log.warning("Got etcd values: addr=%s, scheme=%s, key=%s, cert=%s, "
+                    "ca=%s" %
+                    (self.ETCD_ADDR, self.ETCD_SCHEME, self.ETCD_KEY_FILE,
+                     self.ETCD_CERT_FILE, self.ETCD_CA_FILE))
         self.STARTUP_CLEANUP_DELAY = self.parameters["StartupCleanupDelay"].value
         self.RESYNC_INTERVAL = self.parameters["PeriodicResyncInterval"].value
         self.REFRESH_INTERVAL = self.parameters["IptablesRefreshInterval"].value
